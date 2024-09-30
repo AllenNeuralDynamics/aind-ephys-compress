@@ -1,0 +1,12 @@
+{
+	"version": 1,
+	"parameters": [
+		{
+			"id": "pBJP3cibu8TZPULh",
+			"name": "wavpack bps (bits per sample)",
+			"description": "Bits per sample for lossy compression. Leave empty for lossless. Minimum is 2.25",
+			"type": "text",
+			"value_type": "string"
+		}
+	]
+}

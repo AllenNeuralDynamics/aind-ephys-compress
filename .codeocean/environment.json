@@ -1,0 +1,24 @@
+{
+	"version": 1,
+	"base_image": "codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04",
+	"options": {
+		"registry_host_arg": true,
+		"git_ask_pass": true
+	},
+	"installers": {
+		"pip": {
+			"packages": [
+				{
+					"name": "spikeinterface[full]",
+					"version": "0.101.1"
+				},
+				{
+					"name": "wavpack-numcodecs",
+					"version": "0.2.1"
+				}
+			],
+			"options": {},
+			"pre_install_options": {}
+		}
+	}
+}
