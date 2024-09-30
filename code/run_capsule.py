@@ -117,7 +117,7 @@ if __name__ == "__main__":
                 relative_to=results_folder
             )
 
-            with open(results_folder / job_config_file.name, "w") as f:
+            with open(results_folder / f"{job_config_file.stem}.json", "w") as f:
                 json.dump(job_config, f, indent=4, cls=SIJsonEncoder)
 
 
