@@ -54,6 +54,14 @@ if __name__ == "__main__":
     job_kwargs["progress_bar"] = False
     si.set_global_job_kwargs(**job_kwargs)
 
+    bps_config_files = [
+        p for p in data_folder.iterdir() if p.name.endswith(".txt") and "bps" in p.name
+    ]
+    if len(bps_config_files) == 1:
+        bps_config_file = bps_config_files[0]
+        print(f"Loading BPS from {bps_config_file}")
+        BPS = float(bps_config_file.read_text())
+
     print(f"Running wavpack compression with the following parameters:")
     print(f"\tBPS: {BPS}")
 
