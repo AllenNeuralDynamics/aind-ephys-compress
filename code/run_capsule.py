@@ -49,10 +49,11 @@ if __name__ == "__main__":
     else:
         BPS = float(BPS)
 
-    job_kwargs = {}
-    job_kwargs["n_jobs"] = -1
-    job_kwargs["progress_bar"] = False
-    si.set_global_job_kwargs(**job_kwargs)
+    # Use CO_CPUS/SLURM_JOB_CPUS_PER_NODE env variable if available
+    N_JOBS_EXT = os.getenv("CO_CPUS") or os.getenv("SLURM_JOB_CPUS_PER_NODE")
+    N_JOBS = int(N_JOBS_EXT) if N_JOBS_EXT is not None else -1
+    si.set_global_job_kwargs(dict(n_jobs=N_JOBS, progress_bar=False))
+
 
     bps_config_files = [
         p for p in data_folder.iterdir() if p.name.endswith(".txt") and "bps" in p.name
