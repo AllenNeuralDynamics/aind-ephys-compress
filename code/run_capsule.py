@@ -92,7 +92,7 @@ if __name__ == "__main__":
             skip_times = job_config.get("skip_times", False)
 
             try:
-                recording = si.load_extractor(recording_dict, base_folder=data_folder)
+                recording = si.load(recording_dict, base_folder=data_folder)
             except:
                 raise RuntimeError(
                     f"Could not find load recording {recording_name} from dict. "
