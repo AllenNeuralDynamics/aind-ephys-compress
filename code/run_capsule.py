@@ -49,8 +49,8 @@ if __name__ == "__main__":
     else:
         BPS = float(BPS)
 
-    # Use CO_CPUS/SLURM_JOB_CPUS_PER_NODE env variable if available
-    N_JOBS_EXT = os.getenv("CO_CPUS") or os.getenv("SLURM_JOB_CPUS_PER_NODE")
+    # Use CO_CPUS/SLURM_CPUS_ON_NODE env variable if available
+    N_JOBS_EXT = os.getenv("CO_CPUS") or os.getenv("SLURM_CPUS_ON_NODE")
     N_JOBS = int(N_JOBS_EXT) if N_JOBS_EXT is not None else -1
     si.set_global_job_kwargs(n_jobs=N_JOBS, progress_bar=False)
 
