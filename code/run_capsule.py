@@ -4,6 +4,7 @@ warnings.filterwarnings("ignore")
 
 # GENERAL IMPORTS
 import os
+import sys
 
 # this is needed to limit the number of scipy threads
 # and let spikeinterface handle parallelization
@@ -15,6 +16,7 @@ from pathlib import Path
 import json
 import pickle
 import time
+import logging
 
 # SPIKEINTERFACE
 import spikeinterface as si
@@ -39,6 +41,11 @@ bps_help = "Wavpack BPS"
 bps_group.add_argument("--bps", help=bps_help)
 bps_group.add_argument("static_bps", nargs="?", default="", help=bps_help)
 
+highpass_group = parser.add_mutually_exclusive_group()
+highpass_help = "Whether to highpass the recording prior to compression"
+highpass_group.add_argument("--highpass", help=highpass_help)
+highpass_group.add_argument("static_highpass", nargs="?", default="false", help=highpass_help)
+
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -48,31 +55,37 @@ if __name__ == "__main__":
         BPS = None
     else:
         BPS = float(BPS)
+    HIGHPASS = (
+        args.static_highpass.lower() == "true" if args.static_highpass
+        else args.highpass
+    )
 
     # Use CO_CPUS/SLURM_CPUS_ON_NODE env variable if available
     N_JOBS_EXT = os.getenv("CO_CPUS") or os.getenv("SLURM_CPUS_ON_NODE")
     N_JOBS = int(N_JOBS_EXT) if N_JOBS_EXT is not None else -1
     si.set_global_job_kwargs(n_jobs=N_JOBS, progress_bar=False)
 
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
 
     bps_config_files = [
         p for p in data_folder.iterdir() if p.name.endswith(".txt") and "bps" in p.name
     ]
     if len(bps_config_files) == 1:
         bps_config_file = bps_config_files[0]
-        print(f"Loading BPS from {bps_config_file}")
+        logging.info(f"Loading BPS from {bps_config_file}")
         BPS = float(bps_config_file.read_text())
 
-    print(f"Running wavpack compression with the following parameters:")
-    print(f"\tBPS: {BPS}")
+    logging.info(f"Running wavpack compression with the following parameters:")
+    logging.info(f"\tBPS: {BPS}")
+    logging.info(f"\tHIGHPASS: {HIGHPASS}")
 
     # load job files
     job_config_files = [p for p in data_folder.iterdir() if (p.suffix == ".json" or p.suffix == ".pickle" or p.suffix == ".pkl") and "job" in p.name]
-    print(f"Found {len(job_config_files)} configurations")
+    logging.info(f"Found {len(job_config_files)} configurations")
 
     if len(job_config_files) > 0:
         ####### COMPRESSION #######
-        print("\n\nCOMPRESSING")
+        logging.info("\n\nCOMPRESSING")
         t_compression_start_all = time.perf_counter()
 
         for job_config_file in job_config_files:
@@ -99,19 +112,23 @@ if __name__ == "__main__":
                     f"Make sure mapping is correct!"
                 )
             if skip_times:
-                print("Resetting recording timestamps")
+                logging.info("Resetting recording timestamps")
                 recording.reset_times()
+
+            if HIGHPASS:
+                logging.info("Applying highpass filter")
+                recording = spre.highpass_filter(recording)
 
             compressor = WavPack(bps=BPS)
 
-            print(f"Recording {recording_name}: {recording}")
+            logging.info(f"Recording {recording_name}: {recording}")
 
             recording_compressed = recording.save(
                 folder=results_folder / f"{recording_name}.zarr",
                 format="zarr", compressor=compressor
             )
             cr = recording_compressed.get_annotation("compression_ratio")
-            print(f"Compressed recording. Compression ratio: {cr}")
+            logging.info(f"Compressed recording. Compression ratio: {cr}")
 
             job_config["recording_dict"] = recording_compressed.to_dict(
                 recursive=True,

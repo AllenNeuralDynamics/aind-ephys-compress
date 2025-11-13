@@ -7,6 +7,18 @@
 			"description": "Bits per sample for lossy compression. Leave empty for lossless. Minimum is 2.25",
 			"type": "text",
 			"value_type": "string"
+		},
+		{
+			"id": "WujpvJA34bxN2jB2",
+			"name": "highpass",
+			"description": "Whether to highpass the recording prior to compression",
+			"type": "list",
+			"value_type": "string",
+			"default_value": "false",
+			"extra_data": [
+				"false",
+				"true"
+			]
 		}
 	]
 }
