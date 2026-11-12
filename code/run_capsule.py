@@ -10,7 +10,6 @@ import sys
 # and let spikeinterface handle parallelization
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
-import argparse
 import numpy as np
 from pathlib import Path
 import json
@@ -31,49 +30,53 @@ from wavpack_numcodecs import WavPack
 data_folder = Path("../data/")
 scratch_folder = Path("../scratch/")
 results_folder = Path("../results/")
+PARAMS_FILE = Path("../params.json")
 
 
-# define argument parser
-parser = argparse.ArgumentParser(description="Compress AIND Neurpixels data")
+def run() -> None:
+    if not PARAMS_FILE.is_file():
+        raise ValueError(f"Params file not found: {PARAMS_FILE}")
+    with open(PARAMS_FILE, "r") as f:
+        full_params = json.load(f)
+    compression_params = full_params["compression"]
+    LOGGING = full_params.get("logging", None)
 
-bps_group = parser.add_mutually_exclusive_group()
-bps_help = "Wavpack BPS"
-bps_group.add_argument("--bps", help=bps_help)
-bps_group.add_argument("static_bps", nargs="?", default="", help=bps_help)
-
-highpass_group = parser.add_mutually_exclusive_group()
-highpass_help = "Whether to highpass the recording prior to compression"
-highpass_group.add_argument("--highpass", help=highpass_help)
-highpass_group.add_argument("static_highpass", nargs="?", default="false", help=highpass_help)
-
-
-if __name__ == "__main__":
-    args = parser.parse_args()
-
-    BPS = args.bps or args.static_bps
-    if BPS == "":
-        BPS = None
+    # setup logging before any other logging call
+    if LOGGING is None:
+        logging.basicConfig(level="INFO", stream=sys.stdout, format="%(message)s")
     else:
-        BPS = float(BPS)
-    HIGHPASS = (
-        args.static_highpass.lower() == "true" if args.static_highpass
-        else args.highpass
-    )
+        if LOGGING["package"] == "logging":
+            logging_cfg = LOGGING.get("logging_cfg", {})
+            logging.basicConfig(stream=sys.stdout, **logging_cfg)
+        elif LOGGING["package"] == "log-schema":
+            import log_schema
+
+            pipeline_name = LOGGING.get("pipeline_name", "AIND Ephys Hybrid Benchmark")
+            acquisition_name = LOGGING.get("acquisition_name", "unknown")
+
+            config = LOGGING.get("logging_cfg")
+            if config is not None and len(config) == 0:
+                config = None
+            log_schema.setup_logging(
+                config=config,
+                model={
+                    "pipeline_name": pipeline_name,
+                    "acquisition_name": acquisition_name,
+                    "process_name": "Compression"
+                }
+            )
+
+    logging.info("Begin processing...", extra={"event_type": "stage_start"})
+
+    # COMPRESSION_BPS env variable overrides the params file (one task per compression level)
+    BPS = os.getenv("COMPRESSION_BPS") or compression_params.get("bps", None)
+    BPS = None if BPS in (None, "") else float(BPS)
+    HIGHPASS = compression_params.get("highpass", False)
 
     # Use CO_CPUS/N_JOBS_EXT env variable if available
     N_JOBS_EXT = os.getenv("CO_CPUS") or os.getenv("N_JOBS_EXT")
     N_JOBS = int(N_JOBS_EXT) if N_JOBS_EXT is not None else -1
     si.set_global_job_kwargs(n_jobs=N_JOBS, progress_bar=False)
-
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
-
-    bps_config_files = [
-        p for p in data_folder.iterdir() if p.name.endswith(".txt") and "bps" in p.name
-    ]
-    if len(bps_config_files) == 1:
-        bps_config_file = bps_config_files[0]
-        logging.info(f"Loading BPS from {bps_config_file}")
-        BPS = float(bps_config_file.read_text())
 
     logging.info(f"Running wavpack compression with the following parameters:")
     logging.info(f"\tBPS: {BPS}")
@@ -137,5 +140,12 @@ if __name__ == "__main__":
 
             with open(results_folder / f"{job_config_file.stem}.json", "w") as f:
                 json.dump(job_config, f, indent=4, cls=SIJsonEncoder)
+    logging.info("Pipeline stage completed", extra={"event_type": "stage_complete"})
 
 
+if __name__ == "__main__":
+    try:
+        run()
+    except Exception as e:
+        logging.exception("Pipeline stage failed", extra={"event_type": "stage_error"})
+        raise
